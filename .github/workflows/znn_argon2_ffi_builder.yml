@@ -4,15 +4,16 @@ on:
   push:
     branches:
       - master
+      - cicd
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   build-macos:
-    runs-on: macos-12
+    runs-on: macos-14
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup environment
         run: |
           brew install cmake emscripten
@@ -20,7 +21,8 @@ jobs:
           cmake --version
           emcc --version
       - name: Setup ios-cmake
-        run: git clone https://github.com/leetal/ios-cmake.git
+        run: |
+          git clone https://github.com/leetal/ios-cmake.git
       - name: Create output directories for resulting binaries
         run: |
           mkdir ios64
@@ -36,21 +38,24 @@ jobs:
           cmake --build . --config Release
           cp -R build/Release/argon2_ffi.framework/ ios64/argon2_ffi.framework
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Build ios-simulator-x86_64 framework
         run: |
           cmake CMakeLists.txt -G Xcode -DCMAKE_TOOLCHAIN_FILE=ios-cmake/ios.toolchain.cmake -DPLATFORM=SIMULATOR64
           cmake --build . --config Release
           cp -R build/Release/argon2_ffi.framework/ simulator64/argon2_ffi.framework
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Build ios-simulator-arm64 framework
         run: |
           cmake CMakeLists.txt -G Xcode -DCMAKE_TOOLCHAIN_FILE=ios-cmake/ios.toolchain.cmake -DPLATFORM=SIMULATORARM64
           cmake --build . --config Release
           cp -R build/Release/argon2_ffi.framework/ simulatorarm64/argon2_ffi.framework
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Build darwin framework
         run: |
           cmake CMakeLists.txt
@@ -58,31 +63,35 @@ jobs:
           cp -R build/argon2_ffi.framework darwin/
           cp build/argon2_ffi.framework/Versions/C/argon2_ffi darwin/libargon2_ffi.dylib
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Create simulator
         run: |
           cp -r ./simulator64/argon2_ffi.framework simulator/
           lipo -create simulator64/argon2_ffi.framework/argon2_ffi simulatorarm64/argon2_ffi.framework/argon2_ffi -output simulator/argon2_ffi.framework/argon2_ffi
       - name: Build wasm
-        run: emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s EXPORT_ALL=1 -s LINKABLE=1 src/argon2.c src/blake2/blake2b.c src/encoding.c src/core.c src/genkat.c src/ref.c src/thread.c -o wasm/argon2_ffi.js
+        run: |
+          emcc -O3 -s WASM=1 -s EXTRA_EXPORTED_RUNTIME_METHODS='["cwrap"]' -s EXPORT_ALL=1 -s LINKABLE=1 src/argon2.c src/blake2/blake2b.c src/encoding.c src/core.c src/genkat.c src/ref.c src/thread.c -o wasm/argon2_ffi.js
       - name: Create xcframework
-        run: xcodebuild -create-xcframework -framework darwin/argon2_ffi.framework -framework ios64/argon2_ffi.framework -framework simulator/argon2_ffi.framework -output argon2_ffi.xcframework
+        run: |
+          xcodebuild -create-xcframework -framework darwin/argon2_ffi.framework -framework ios64/argon2_ffi.framework -framework simulator/argon2_ffi.framework -output argon2_ffi.xcframework
       - name: Archive files
         run: |
           zip -r argon2_ffi.xcframework.zip argon2_ffi.xcframework
           zip -jr libargon2_ffi-darwin-universal.zip darwin/libargon2_ffi.dylib
           zip -jr libargon2_ffi-wasm.zip wasm/*
       - name: Copy archived files to releases
-        run: cp argon2_ffi.xcframework.zip libargon2_ffi-darwin-universal.zip libargon2_ffi-wasm.zip releases/
-      - uses: actions/upload-artifact@v3
+        run: |
+          cp argon2_ffi.xcframework.zip libargon2_ffi-darwin-universal.zip libargon2_ffi-wasm.zip releases/
+      - uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
           path: releases/
   build-linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup environment
         run: |
           sudo apt update
@@ -103,14 +112,16 @@ jobs:
           cmake --build . --config Release
           cp build/libargon2_ffi.so linux-amd64/libargon2_ffi_plugin.so
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Build linux-arm64 shared library
         run: |
           cmake CMakeLists.txt -DCMAKE_TOOLCHAIN_FILE=aarch64-linux-gnu.cmake
           cmake --build . --config Release
           cp build/libargon2_ffi.so linux-arm64/libargon2_ffi_plugin.so
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Setup Android NDK
         run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r25-linux.zip
@@ -121,14 +132,16 @@ jobs:
           cmake --build . --config Release
           cp build/libargon2_ffi.so android-arm64_v8a/
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Build android-x86_64 shared library
         run: |
           cmake CMakeLists.txt -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_ARCH_ABI=x86_64 -DCMAKE_ANDROID_NDK=/home/runner/work/argon2_ffi/argon2_ffi/android-ndk-r25 -DCMAKE_ANDROID_STL_TYPE=c++_shared
           cmake --build . --config Release
           cp build/libargon2_ffi.so android-x86_64/
       - name: Cleanup action
-        run: rm -rf CMakeFiles/ CMakeCache.txt build/*
+        run: |
+          rm -rf CMakeFiles/ CMakeCache.txt build/*
       - name: Build windows-amd64 dynamic library
         run: |
           cmake CMakeLists.txt -DCMAKE_TOOLCHAIN_FILE=mingw-w64-x86_64.cmake
@@ -142,19 +155,20 @@ jobs:
           zip -jr libargon2_ffi-android-x86_64.zip android-x86_64/*
           zip -jr libargon2_ffi-windows-amd64.zip windows-amd64/*
       - name: Copy archived files to releases
-        run: cp libargon2_ffi-linux-amd64.zip libargon2_ffi-linux-arm64.zip libargon2_ffi-android-arm64_v8a.zip libargon2_ffi-android-x86_64.zip libargon2_ffi-windows-amd64.zip releases/
-      - uses: actions/upload-artifact@v3
+        run: |
+          cp libargon2_ffi-linux-amd64.zip libargon2_ffi-linux-arm64.zip libargon2_ffi-android-arm64_v8a.zip libargon2_ffi-android-x86_64.zip libargon2_ffi-windows-amd64.zip releases/
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
           path: releases/
   make-release:
         needs: [build-macos, build-linux]
-        runs-on: ubuntu-20.04
+        runs-on: ubuntu-22.04
         steps:
-          - uses: actions/download-artifact@v3
+          - uses: actions/download-artifact@v4
             with:
               name: macos-artifacts
-          - uses: actions/download-artifact@v3
+          - uses: actions/download-artifact@v4
             with:
               name: linux-artifacts
           - name: Prepare releases directory
@@ -167,11 +181,12 @@ jobs:
               echo $(sha256sum *)
               echo $(sha256sum *) >> SHA256CHECKSUMS.txt
           - name: Upload files to a GitHub release
-            uses: svenstaro/upload-release-action@2.6.1
+            uses: svenstaro/upload-release-action@2.9.0
             with:
               repo_token: ${{ secrets.GITHUB_TOKEN }}
               file: releases/*
-              tag: v0.0.1-alpha
+              tag: v0.0.1
               file_glob: true
               overwrite: true
+              release_name: "Argon2 Library"
               body: ""
